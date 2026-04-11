@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 1. Product Model - Inventory track korar jonno
+model Product {
+  id            String  @id @default(uuid())
+  modelName     String  @unique
+  boxNumber     String?
+  costPrice     Decimal @db.Decimal(10, 2)
+  sellingPrice  Decimal @db.Decimal(10, 2)
+  stockQuantity Int     @default(0)
+
+  sales     Sale[]
+  stockLogs StockLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([modelName]) // Search fast korar jonno index
+}
+
+// 2. Buyer Model - Customer details o Due tracking
+model Buyer {
+  id       String  @id @default(uuid())
+  name     String
+  phone    String? @unique
+  address  String?
+  totalDue Decimal @default(0) @db.Decimal(10, 2)
+
+  sales     Sale[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+// 3. Sale Model - Protita transaction er record
+model Sale {
+  id String @id @default(uuid())
+
+  // Relationships
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  buyerId   String
+  buyer     Buyer   @relation(fields: [buyerId], references: [id])
+
+  // Sales Data
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(10, 2) // Oi muhurte koto dame sell hoise
+  totalAmount Decimal @db.Decimal(10, 2)
+  paidAmount  Decimal @db.Decimal(10, 2)
+  dueAmount   Decimal @db.Decimal(10, 2)
+
+  saleTime DateTime @default(now()) // Exact time tracking
+
+  returns Return[]
+
+  createdAt DateTime @default(now())
+}
+
+// 4. Return Model - Auto stock update handle korar jonno
+model Return {
+  id     String @id @default(uuid())
+  saleId String
+  sale   Sale   @relation(fields: [saleId], references: [id])
+
+  quantity   Int
+  reason     String // Return er karon
+  returnDate DateTime @default(now())
+}
+
+// 5. StockLog Model - Proti ta stock change er history (Audit Trail)
+model StockLog {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  changeType StockChangeType
+  quantity   Int // Positive (+5) mane stock add, Negative (-3) mane sell ba loss
+  reason     String // "Sale", "Customer Return", "Damaged", "New Stock Arrival" etc.
+
+  createdAt DateTime @default(now())
+}
+
+enum StockChangeType {
+  SALE
+  RETURN
+  MANUAL_ADJUSTMENT
+  RESTOCK
+}
