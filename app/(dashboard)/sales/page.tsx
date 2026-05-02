@@ -39,7 +39,7 @@ export default async function SalesHistoryPage({
     }),
   };
 
-  const [sales, total, summary] = await Promise.all([
+  const [rawSales, total, summary] = await Promise.all([
     prisma.sale.findMany({
       where,
       orderBy: { saleTime: "desc" },
@@ -62,6 +62,15 @@ export default async function SalesHistoryPage({
       },
     }),
   ]);
+
+  // Decimal ভ্যালুগুলোকে Number-এ কনভার্ট করে দিচ্ছি
+  const sales = rawSales.map((sale) => ({
+    ...sale,
+    unitPrice: Number(sale.unitPrice),
+    totalAmount: Number(sale.totalAmount),
+    paidAmount: Number(sale.paidAmount),
+    dueAmount: Number(sale.dueAmount),
+  }));
 
   const totalAmount = Number(summary._sum.totalAmount ?? 0);
   const totalPaid = Number(summary._sum.paidAmount ?? 0);

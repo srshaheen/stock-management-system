@@ -1,3 +1,5 @@
+"use client";
+
 import type { Sale } from "@prisma/client";
 import {
   Table,
@@ -9,11 +11,21 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Pagination from "./Pagination";
+import { useState } from "react";
+import { processReturn } from "./return-action";
 
-type SaleWithDetails = Sale & {
+// Decimal ফিল্ডগুলো বাদ দিয়ে number সেট করা হয়েছে
+export type SaleWithDetails = Omit<
+  Sale,
+  "unitPrice" | "totalAmount" | "paidAmount" | "dueAmount"
+> & {
+  unitPrice: number;
+  totalAmount: number;
+  paidAmount: number;
+  dueAmount: number;
   product: { modelName: string; boxNumber: string | null };
   buyer: { id: string; name: string };
   returns: { quantity: number }[];
@@ -49,8 +61,52 @@ export default function SalesTable({
   totalPages,
   pageSize,
 }: Props) {
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+
   const from = (currentPage - 1) * pageSize + 1;
   const to = Math.min(currentPage * pageSize, total);
+
+  const handleReturn = async (saleId: string, maxQuantity: number) => {
+    // ইউজারের কাছে Quantity জানতে চাওয়া
+    const qtyStr = window.prompt(
+      `How many items do you want to return? (Max: ${maxQuantity})`,
+      "1",
+    );
+    if (!qtyStr) return;
+
+    const qty = parseInt(qtyStr);
+    if (isNaN(qty) || qty <= 0 || qty > maxQuantity) {
+      alert("Invalid quantity!");
+      return;
+    }
+
+    // কনফার্মেশন নেওয়া
+    const isConfirmed = window.confirm(
+      `Are you sure you want to return ${qty} item(s)?`,
+    );
+    if (!isConfirmed) return;
+
+    setLoadingId(saleId);
+    try {
+      const formData = new FormData();
+      formData.append("saleId", saleId);
+      formData.append("quantity", qty.toString());
+      formData.append("reason", "Direct return from Sales Table");
+
+      const result = await processReturn(formData);
+
+      if (result?.error) {
+        alert("Error: " + result.error);
+      } else {
+        alert("Return processed successfully!");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to process return. Please try again.");
+    } finally {
+      setLoadingId(null);
+    }
+  };
 
   if (sales.length === 0) {
     return (
@@ -65,7 +121,6 @@ export default function SalesTable({
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-        {/* Count header */}
         <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b">
           <h2 className="text-sm font-semibold text-slate-700">Transactions</h2>
           <span className="text-xs text-slate-400">
@@ -88,13 +143,15 @@ export default function SalesTable({
           </TableHeader>
           <TableBody>
             {sales.map((sale) => {
-              const due = Number(sale.dueAmount);
+              const due = sale.dueAmount;
               const totalReturned = sale.returns.reduce(
                 (acc, r) => acc + r.quantity,
                 0,
               );
-              // সব quantity return হয়ে গেলে আর return করা যাবে না
+
               const canReturn = totalReturned < sale.quantity;
+              const remainingQuantity = sale.quantity - totalReturned;
+              const isReturning = loadingId === sale.id;
 
               return (
                 <TableRow key={sale.id}>
@@ -139,16 +196,18 @@ export default function SalesTable({
                   </TableCell>
 
                   <TableCell className="text-right font-medium">
-                    {formatAmount(Number(sale.totalAmount))}
+                    {formatAmount(sale.totalAmount)}
                   </TableCell>
 
                   <TableCell className="text-right text-green-700 font-medium">
-                    {formatAmount(Number(sale.paidAmount))}
+                    {formatAmount(sale.paidAmount)}
                   </TableCell>
 
                   <TableCell className="text-right">
                     <span
-                      className={`font-bold ${due > 0 ? "text-red-600" : "text-green-600"}`}
+                      className={`font-bold ${
+                        due > 0 ? "text-red-600" : "text-green-600"
+                      }`}
                     >
                       {formatAmount(due)}
                     </span>
@@ -159,10 +218,15 @@ export default function SalesTable({
                       <Button
                         variant="ghost"
                         size="sm"
+                        disabled={isReturning}
                         className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 h-8"
-                        asChild
+                        onClick={() => handleReturn(sale.id, remainingQuantity)}
                       >
-                        <Link href={`/sales/${sale.id}/return`}>Return</Link>
+                        {isReturning ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Return"
+                        )}
                       </Button>
                     ) : (
                       <span className="text-xs text-slate-400 pr-2">
