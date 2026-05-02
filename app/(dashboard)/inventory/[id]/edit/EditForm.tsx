@@ -8,11 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { Prisma, Product } from "@prisma/client";
+import type { Product } from "@prisma/client"; // শুধু type ইমপোর্ট করা হলো
 
-export default function EditForm({ product }: { product: Product }) {
-  // Prisma Decimal object ke number e convert kora — DB theke asle Decimal instance hoy
-  const originalStock = product.stockQuantity; // Int, already number
+// Client-এ পাঠানোর জন্য Decimal ফিল্ডগুলোকে number/string হিসেবে ডিক্লেয়ার করা হলো
+type ClientProduct = Omit<Product, "costPrice" | "sellingPrice"> & {
+  costPrice: number | string;
+  sellingPrice: number | string;
+};
+
+export default function EditForm({ product }: { product: ClientProduct }) {
+  const originalStock = product.stockQuantity;
 
   const [stockInput, setStockInput] = useState<number>(originalStock);
   const [isPending, startTransition] = useTransition();
@@ -21,7 +26,6 @@ export default function EditForm({ product }: { product: Product }) {
 
   const handleStockChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const parsed = parseInt(e.target.value, 10);
-    // NaN hole original e ফিরে না গিয়ে empty রাখা — browser validation handle করবে
     if (!isNaN(parsed)) {
       setStockInput(Math.max(0, parsed));
     }
@@ -31,7 +35,6 @@ export default function EditForm({ product }: { product: Product }) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
-    // Extra client-side guard — JS bypass er jonno
     if (isStockChanged) {
       const reason = (formData.get("reason") as string)?.trim();
       if (!reason) return;
@@ -70,7 +73,6 @@ export default function EditForm({ product }: { product: Product }) {
               <Input
                 id="boxNumber"
                 name="boxNumber"
-                // boxNumber String? — null hote pare, ?? diye empty string fallback
                 defaultValue={product.boxNumber ?? ""}
                 disabled={isPending}
               />
@@ -81,7 +83,7 @@ export default function EditForm({ product }: { product: Product }) {
                 id="stockQuantity"
                 name="stockQuantity"
                 type="number"
-                min={0} // StockLog e negative thakle stockQuantity 0 er niche jawa uchit na
+                min={0}
                 value={stockInput}
                 onChange={handleStockChange}
                 required
@@ -99,8 +101,8 @@ export default function EditForm({ product }: { product: Product }) {
                 type="number"
                 step="0.01"
                 min={0}
-                // Prisma Decimal → number convert: .toNumber() is the correct method
-                defaultValue={new Prisma.Decimal(product.costPrice).toNumber()}
+                // Prisma-র বদলে সরাসরি Number() ব্যবহার করা হলো
+                defaultValue={Number(product.costPrice)}
                 required
                 disabled={isPending}
               />
@@ -113,16 +115,14 @@ export default function EditForm({ product }: { product: Product }) {
                 type="number"
                 step="0.01"
                 min={0}
-                defaultValue={new Prisma.Decimal(
-                  product.sellingPrice,
-                ).toNumber()}
+                // Prisma-র বদলে সরাসরি Number() ব্যবহার করা হলো
+                defaultValue={Number(product.sellingPrice)}
                 required
                 disabled={isPending}
               />
             </div>
           </div>
 
-          {/* StockLog er jonno — isStockChanged true hole audit trail create hobe */}
           {isStockChanged && (
             <div className="grid gap-2 bg-orange-50 p-4 rounded-lg border border-orange-200 animate-in fade-in zoom-in duration-300">
               <Label htmlFor="reason" className="text-orange-800 font-bold">

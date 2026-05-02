@@ -8,13 +8,22 @@ export default async function EditProductPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const product = await prisma.product.findUnique({
+
+  // ডাটাবেস থেকে র ডাটা আনা হচ্ছে
+  const rawProduct = await prisma.product.findUnique({
     where: { id: id },
   });
 
-  if (!product) {
+  if (!rawProduct) {
     notFound();
   }
+
+  // Decimal ফিল্ডগুলোকে Number-এ কনভার্ট করা হচ্ছে
+  const product = {
+    ...rawProduct,
+    costPrice: Number(rawProduct.costPrice),
+    sellingPrice: Number(rawProduct.sellingPrice),
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -25,7 +34,7 @@ export default async function EditProductPage({
         </p>
       </div>
 
-      {/* Component a data pass kora holo */}
+      {/* এখন কনভার্ট করা ডাটা কম্পোনেন্টে পাস করা হলো */}
       <EditForm product={product} />
     </div>
   );
