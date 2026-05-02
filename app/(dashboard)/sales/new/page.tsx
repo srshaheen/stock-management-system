@@ -23,7 +23,7 @@ export default async function NewSalePage() {
           <CardTitle>Create New Sale Transaction</CardTitle>
         </CardHeader>
         <CardContent className="p-6">
-          <form action={createSale} className="grid gap-6">
+          <form action={createSale as any} className="grid gap-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Select Product (Model)</Label>
